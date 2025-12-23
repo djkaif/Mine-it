@@ -1,62 +1,67 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 const path = require('path');
 const app = express();
 
 app.use(express.json());
-// This tells the server to show files from the "public" folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- DATABASE SETUP ---
-const db = new sqlite3.Database('./game.db');
+const DB_FILE = './database.json';
 
-// Create tables for Users and Withdrawals if they don't exist
-db.serialize(() => {
-    db.run("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, credits INTEGER DEFAULT 100)");
-    db.run("CREATE TABLE IF NOT EXISTS withdrawals (id INTEGER PRIMARY KEY, userId INTEGER, type TEXT, amount INTEGER, details TEXT, status TEXT DEFAULT 'PENDING')");
-});
+// --- HELPER FUNCTIONS TO READ/WRITE JSON ---
+const readDB = () => {
+    if (!fs.existsSync(DB_FILE)) {
+        // Default data if file doesn't exist
+        return { users: [], withdrawals: [] };
+    }
+    return JSON.parse(fs.readFileSync(DB_FILE));
+};
+
+const writeDB = (data) => {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+};
 
 // --- GAME LOGIC ---
 app.post('/api/mines/start', (req, res) => {
-    // Basic logic for testing: random bomb locations
     const bombLocations = [];
     while(bombLocations.length < 5) {
         let r = Math.floor(Math.random() * 25);
         if(!bombLocations.includes(r)) bombLocations.push(r);
     }
-    // In production, we'd save these bombs to the DB to prevent cheating
-    res.json({ message: "Game Started", totalMines: 5 });
+    res.json({ message: "Game Started (JSON Mode)", totalMines: 5 });
 });
 
 // --- ADMIN LOGIC ---
 
-// 1. Get all users for the Admin Panel
+// 1. Get all users
 app.get('/api/admin/users', (req, res) => {
-    db.all("SELECT * FROM users", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
+    const db = readDB();
+    res.json(db.users);
 });
 
-// 2. Get all pending withdrawals for the Admin Panel
+// 2. Get all pending withdrawals
 app.get('/api/admin/withdrawals', (req, res) => {
-    db.all("SELECT * FROM withdrawals WHERE status = 'PENDING'", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
+    const db = readDB();
+    const pending = db.withdrawals.filter(w => w.status === 'PENDING');
+    res.json(pending);
 });
 
 // 3. Admin Approval Action
 app.post('/api/admin/approve', (req, res) => {
     const { id } = req.body;
-    db.run("UPDATE withdrawals SET status = 'COMPLETED' WHERE id = ?", [id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+    const db = readDB();
+    const index = db.withdrawals.findIndex(w => w.id === id);
+    
+    if (index !== -1) {
+        db.withdrawals[index].status = 'COMPLETED';
+        writeDB(db);
         res.json({ success: true });
-    });
+    } else {
+        res.status(404).json({ error: "Request not found" });
+    }
 });
 
-// Start the server
 const PORT = 3000;
 app.listen(PORT, () => {
-    console.log(`Server is running! View it at http://localhost:${PORT}`);
+    console.log(`Server running with JSON DB! http://localhost:${PORT}`);
 });
