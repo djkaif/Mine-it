@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mines Rewards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white font-sans">
+    <nav class="p-4 bg-slate-800 flex justify-between">
+        <h1 class="text-xl font-bold text-indigo-400">GamerPay</h1>
+        <div>Credits: <span id="balance">100</span></div>
+    </nav>
+
+    <div class="max-w-md mx-auto mt-10 p-4">
+        <div id="grid" class="grid grid-cols-5 gap-2 bg-slate-800 p-4 rounded-xl">
+            </div>
+        <button onclick="startGame()" class="w-full mt-6 bg-indigo-600 py-3 rounded-lg font-bold">START GAME</button>
+    </div>
+
+    <script>
+        function startGame() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for(let i=0; i<25; i++) {
+                const tile = document.createElement('div');
+                tile.className = "h-12 w-12 bg-slate-700 rounded cursor-pointer hover:bg-slate-600 transition flex items-center justify-center";
+                tile.onclick = () => revealTile(tile, i);
+                grid.appendChild(tile);
+            }
+        }
+        
+        function revealTile(el, id) {
+            // 20% chance of bomb for this demo
+            const isBomb = Math.random() < 0.2;
+            el.innerHTML = isBomb ? '💣' : '💎';
+            el.className = isBomb ? "h-12 w-12 bg-red-600 rounded flex items-center justify-center" : "h-12 w-12 bg-emerald-500 rounded flex items-center justify-center";
+            el.onclick = null; // Disable further clicks on this tile
+            if(isBomb) {
+                setTimeout(() => alert("Game Over!"), 100);
+            }
+        }
+    </script>
+</body>
+</html>
+
