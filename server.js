@@ -8,7 +8,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const DB_FILE = './database.json';
-const ADMIN_PASSWORD = "your_secure_password"; // CHANGE THIS
+const ADMIN_PASSWORD = "tomextra_is_the_goat"; // CHANGE THIS
 
 // --- DB HELPERS ---
 const readDB = () => {
