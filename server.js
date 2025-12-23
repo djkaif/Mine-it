@@ -21,6 +21,22 @@ const writeDB = (data) => {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 };
 
+// Add a withdrawal request
+app.post('/api/withdraw', (req, res) => {
+    const db = readDB();
+    const newRequest = {
+        id: req.body.id,
+        type: req.body.type,
+        amount: req.body.amount,
+        details: req.body.details,
+        status: 'PENDING'
+    };
+    db.withdrawals.push(newRequest);
+    writeDB(db);
+    res.json({ success: true });
+});
+
+
 // --- GAME LOGIC ---
 app.post('/api/mines/start', (req, res) => {
     const bombLocations = [];
