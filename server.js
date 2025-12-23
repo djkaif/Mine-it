@@ -7,7 +7,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Your MongoDB Connection String
-const MONGO_URI = "mongodb+srv://djkaif:iamdjkaifbd1@cluster0.3cfwhjm.mongodb.net/gamerpay?retryWrites=true&w=majority&appName=Cluster0";
+// This tells the code: "Look for a secret called MONGO_URI. If you can't find it, use a local test link."
+const MONGO_URI = process.env.MONGO_URI;
+
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
