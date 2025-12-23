@@ -1,111 +1,129 @@
 const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const sqlite3 = require('sqlite3').verbose();
+const mongoose = require('mongoose');
 const app = express();
 
-// CHANGE 1: Use Render's dynamic port
 const PORT = process.env.PORT || 3000;
+
+// Your MongoDB Connection String
+const MONGO_URI = "mongodb+srv://djkaif:iamdjkaifbd1@cluster0.3cfwhjm.mongodb.net/gamerpay?retryWrites=true&w=majority&appName=Cluster0";
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const ADMIN_PASSWORD = "1234nah";
 
-// CHANGE 2: Use the Persistent Disk path on Render
-const DB_PATH = process.env.RENDER ? '/data/database.sqlite' : './database.sqlite';
+// --- DATABASE CONNECTION ---
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("✅ Connected to MongoDB Atlas"))
+    .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
-const db = new sqlite3.Database(DB_PATH, (err) => {
-    if (err) console.error(err.message);
-    console.log('Connected to SQLite database.');
+// --- MONGODB SCHEMAS ---
+const User = mongoose.model('User', {
+    username: { type: String, unique: true, required: true },
+    password: { type: String, required: true },
+    credits: { type: Number, default: 100 },
+    joined: String
 });
 
-// Create tables if they don't exist
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT,
-        credits INTEGER,
-        joined TEXT
-    )`);
-    db.run(`CREATE TABLE IF NOT EXISTS withdrawals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT,
-        type TEXT,
-        amount INTEGER,
-        code TEXT,
-        status TEXT,
-        date TEXT
-    )`);
-    db.run(`CREATE TABLE IF NOT EXISTS config (
-        key TEXT PRIMARY KEY,
-        value INTEGER
-    )`);
+const Withdrawal = mongoose.model('Withdrawal', {
+    username: String,
+    type: String,
+    amount: Number,
+    code: String,
+    status: { type: String, default: 'PENDING' },
+    date: { type: Date, default: Date.now }
+});
+
+const Config = mongoose.model('Config', {
+    key: String,
+    value: Number
+});
+
+// Setup Initial Platform Config
+async function setupConfig() {
+    const reward = await Config.findOne({ key: 'mineReward' });
+    if (!reward) await Config.create({ key: 'mineReward', value: 5 });
     
-    // Default Config
-    db.run(`INSERT OR IGNORE INTO config (key, value) VALUES ('mineReward', 5)`);
-    db.run(`INSERT OR IGNORE INTO config (key, value) VALUES ('startCredits', 100)`);
-});
-
-// Helper for Config
-const getConfig = (key) => {
-    return new Promise((resolve) => {
-        db.get(`SELECT value FROM config WHERE key = ?`, [key], (err, row) => {
-            resolve(row ? row.value : 0);
-        });
-    });
-};
+    const startCreds = await Config.findOne({ key: 'startCredits' });
+    if (!startCreds) await Config.create({ key: 'startCredits', value: 100 });
+}
+setupConfig();
 
 // --- AUTH API ---
 app.post('/api/auth/register', async (req, res) => {
     const { username, password } = req.body;
-    const startCredits = await getConfig('startCredits');
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const date = new Date().toISOString().split('T')[0];
-
-    db.run(`INSERT INTO users (username, password, credits, joined) VALUES (?, ?, ?, ?)`, 
-        [username, hashedPassword, startCredits, date], (err) => {
-        if (err) return res.status(400).json({ error: "Username taken" });
+    try {
+        const startCreditsEntry = await Config.findOne({ key: 'startCredits' });
+        const startCredits = startCreditsEntry ? startCreditsEntry.value : 100;
+        
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({
+            username,
+            password: hashedPassword,
+            credits: startCredits,
+            joined: new Date().toISOString().split('T')[0]
+        });
+        await newUser.save();
         res.json({ success: true });
-    });
+    } catch (e) {
+        res.status(400).json({ error: "Username already exists" });
+    }
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
-    db.get(`SELECT * FROM users WHERE username = ?`, [username], async (err, user) => {
-        if (user && await bcrypt.compare(password, user.password)) {
-            res.json({ success: true, user: { username: user.username, credits: user.credits } });
-        } else {
-            res.status(401).json({ error: "Invalid credentials" });
-        }
-    });
+    const user = await User.findOne({ username });
+    if (user && await bcrypt.compare(password, user.password)) {
+        res.json({ success: true, user: { username: user.username, credits: user.credits } });
+    } else {
+        res.status(401).json({ error: "Invalid username or password" });
+    }
 });
 
-// --- GAME LOGIC ---
-app.post('/api/user/update-balance', (req, res) => {
+// --- GAME & BALANCE API ---
+app.post('/api/user/update-balance', async (req, res) => {
     const { username, amount } = req.body;
-    db.run(`UPDATE users SET credits = credits + ? WHERE username = ?`, [amount, username], function(err) {
-        if (err) return res.status(500).send();
-        db.get(`SELECT credits FROM users WHERE username = ?`, [username], (err, row) => {
-            res.json({ success: true, balance: row.credits });
-        });
-    });
+    try {
+        const user = await User.findOneAndUpdate(
+            { username }, 
+            { $inc: { credits: amount } }, 
+            { new: true }
+        );
+        if (user) {
+            res.json({ success: true, balance: user.credits });
+        } else {
+            res.status(404).json({ error: "User not found" });
+        }
+    } catch (e) {
+        res.status(500).json({ error: "Balance update failed" });
+    }
 });
 
-// --- WITHDRAWAL ---
-app.post('/api/withdraw', (req, res) => {
+// --- WITHDRAWAL API ---
+app.post('/api/withdraw', async (req, res) => {
     const { username, amount, type } = req.body;
-    db.get(`SELECT credits FROM users WHERE username = ?`, [username], (err, user) => {
-        if (!user || user.credits < amount) return res.status(400).json({ error: "Insufficient credits" });
+    const user = await User.findOne({ username });
 
-        const claimCode = "GP-" + Math.random().toString(36).substring(2, 9).toUpperCase();
-        db.serialize(() => {
-            db.run(`UPDATE users SET credits = credits - ? WHERE username = ?`, [amount, username]);
-            db.run(`INSERT INTO withdrawals (username, type, amount, code, status, date) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
-                [username, type, amount, claimCode, new Date().toISOString()]);
-            res.json({ success: true, code: claimCode });
-        });
+    if (!user || user.credits < amount) {
+        return res.status(400).json({ error: "Insufficient credits" });
+    }
+
+    const claimCode = "GP-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+    
+    // Deduct credits and create record
+    await User.updateOne({ username }, { $inc: { credits: -amount } });
+    const newWithdrawal = new Withdrawal({
+        username,
+        type,
+        amount,
+        code: claimCode,
+        status: 'PENDING'
     });
+    await newWithdrawal.save();
+
+    res.json({ success: true, code: claimCode });
 });
 
 // --- ADMIN API ---
@@ -114,53 +132,51 @@ app.post('/api/admin/auth', (req, res) => {
 });
 
 app.get('/api/admin/stats', async (req, res) => {
-    const today = new Date().toISOString().split('T')[0];
-    const mineReward = await getConfig('mineReward');
-    const startCredits = await getConfig('startCredits');
+    const totalUsers = await User.countDocuments();
+    const pendingWithdrawals = await Withdrawal.countDocuments({ status: 'PENDING' });
+    const mineReward = await Config.findOne({ key: 'mineReward' });
+    const startCredits = await Config.findOne({ key: 'startCredits' });
 
-    db.get(`SELECT COUNT(*) as total, SUM(CASE WHEN joined = ? THEN 1 ELSE 0 END) as daily FROM users`, [today], (err, row) => {
-        db.get(`SELECT COUNT(*) as pending FROM withdrawals WHERE status = 'PENDING'`, (err, wRow) => {
-            res.json({
-                totalUsers: row.total || 0,
-                dailyUsers: row.daily || 0,
-                totalWithdrawals: wRow.pending || 0,
-                config: { mineReward, startCredits }
-            });
-        });
+    res.json({
+        totalUsers,
+        totalWithdrawals: pendingWithdrawals,
+        config: {
+            mineReward: mineReward ? mineReward.value : 5,
+            startCredits: startCredits ? startCredits.value : 100
+        }
     });
 });
 
-app.get('/api/admin/withdrawals', (req, res) => {
-    db.all(`SELECT * FROM withdrawals WHERE status = 'PENDING'`, (err, rows) => {
-        res.json(rows);
-    });
+app.get('/api/admin/withdrawals', async (req, res) => {
+    const pending = await Withdrawal.find({ status: 'PENDING' });
+    res.json(pending);
 });
 
-app.post('/api/admin/update-credits', (req, res) => {
+app.post('/api/admin/update-credits', async (req, res) => {
     const { username, amount, action, adminPass } = req.body;
     if(adminPass !== ADMIN_PASSWORD) return res.status(403).send();
-    const val = action === 'add' ? parseInt(amount) : -parseInt(amount);
-    db.run(`UPDATE users SET credits = credits + ? WHERE username = ?`, [val, username], (err) => {
-        res.json({ success: !err });
-    });
+    
+    const change = action === 'add' ? parseInt(amount) : -parseInt(amount);
+    const user = await User.findOneAndUpdate({ username }, { $inc: { credits: change } });
+    
+    res.json({ success: !!user });
 });
 
-app.post('/api/admin/config', (req, res) => {
+app.post('/api/admin/config', async (req, res) => {
     const { startCredits, mineReward, adminPass } = req.body;
     if(adminPass !== ADMIN_PASSWORD) return res.status(403).send();
-    db.serialize(() => {
-        db.run(`UPDATE config SET value = ? WHERE key = 'startCredits'`, [startCredits]);
-        db.run(`UPDATE config SET value = ? WHERE key = 'mineReward'`, [mineReward]);
-        res.json({ success: true });
-    });
+    
+    await Config.updateOne({ key: 'startCredits' }, { value: parseInt(startCredits) });
+    await Config.updateOne({ key: 'mineReward' }, { value: parseInt(mineReward) });
+    
+    res.json({ success: true });
 });
 
-app.post('/api/admin/approve', (req, res) => {
+app.post('/api/admin/approve', async (req, res) => {
     const { id } = req.body;
-    db.run(`UPDATE withdrawals SET status = 'COMPLETED' WHERE id = ?`, [id], (err) => {
-        res.json({ success: !err });
-    });
+    // For MongoDB, we use _id
+    const updated = await Withdrawal.findByIdAndUpdate(id, { status: 'COMPLETED' });
+    res.json({ success: !!updated });
 });
 
-// Final Change: Listen on the Dynamic Port
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
