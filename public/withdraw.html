@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Withdraw - GamerPay</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white p-6">
+    <div class="max-w-md mx-auto">
+        <a href="/" class="text-indigo-400 text-sm">← Back to Game</a>
+        <h1 class="text-2xl font-bold mt-4">Redeem Rewards</h1>
+        
+        <div class="mt-6 space-y-4">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <label class="block text-xs text-slate-400 uppercase">Reward Type</label>
+                <select id="type" class="w-full bg-transparent mt-1 font-bold outline-none">
+                    <option class="bg-slate-800">Robux (100 Credits = 10 RBX)</option>
+                    <option class="bg-slate-800">PayPal Cash ($1 = 1000 Credits)</option>
+                </select>
+            </div>
+
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <label class="block text-xs text-slate-400 uppercase">Amount</label>
+                <input id="amount" type="number" placeholder="Enter credits" class="w-full bg-transparent mt-1 outline-none font-mono">
+            </div>
+
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <label class="block text-xs text-slate-400 uppercase">Your Details (Username/Email)</label>
+                <input id="details" type="text" placeholder="e.g. PlayerName#123" class="w-full bg-transparent mt-1 outline-none">
+            </div>
+
+            <button onclick="requestWithdraw()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold shadow-lg">
+                SUBMIT REQUEST
+            </button>
+        </div>
+    </div>
+
+    <script>
+        async function requestWithdraw() {
+            const data = {
+                type: document.getElementById('type').value,
+                amount: document.getElementById('amount').value,
+                details: document.getElementById('details').value,
+                id: Date.now() // Unique ID for testing
+            };
+
+            const res = await fetch('/api/withdraw', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if(res.ok) alert("Request sent to Admin! Wait for approval.");
+        }
+    </script>
+</body>
+</html>
