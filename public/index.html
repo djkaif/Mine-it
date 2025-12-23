@@ -5,71 +5,186 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GamerPay - Play & Earn</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal-bg { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); }
+        .grid-tile { transition: all 0.2s ease; }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen">
-    <nav class="p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700">
-        <h1 class="text-xl font-bold text-indigo-400 italic">GAMERPAY</h1>
-        <div class="bg-slate-900 px-4 py-1 rounded-full border border-slate-600">
-            <span class="text-xs text-slate-400">Balance:</span>
-            <span id="balanceDisplay" class="font-mono text-emerald-400">0</span>
-        </div>
-    </nav>
+<body class="bg-slate-900 text-white min-h-screen font-sans">
 
-    <div class="max-w-md mx-auto mt-8 p-4">
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold">Mines Game</h2>
-            <p class="text-slate-400 text-sm">Find gems, avoid the 5 hidden bombs!</p>
-        </div>
-
-        <div id="grid" class="grid grid-cols-5 gap-2 bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-700">
+    <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-bg">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-md p-8 rounded-3xl shadow-2xl">
+            <div id="tutorial-step">
+                <h2 class="text-3xl font-bold text-indigo-400 mb-4">Welcome to GamerPay! 🎮</h2>
+                <p class="text-slate-300 mb-6 leading-relaxed">Play mini-games to earn Credits. Redeem Credits for Robux, PayPal, and more. <br><br>First, create an account to save your progress.</p>
+                <button onclick="showAuthForm()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold hover:bg-indigo-500 transition">Get Started</button>
             </div>
 
-        <div class="mt-6 space-y-3">
-            <button id="startBtn" onclick="initGame()" class="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-bold transition shadow-lg shadow-indigo-500/20">
-                NEW GAME (Cost 10)
-            </button>
-            <button id="cashoutBtn" onclick="cashOut()" disabled class="w-full bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed py-3 rounded-xl font-bold transition">
-                CASH OUT
+            <div id="auth-form" class="hidden space-y-4">
+                <h2 id="auth-title" class="text-2xl font-bold mb-4 text-center">Create Account</h2>
+                <input id="auth-user" type="text" placeholder="Username" class="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none focus:border-indigo-500">
+                <input id="auth-pass" type="password" placeholder="Password" class="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none focus:border-indigo-500">
+                <button onclick="handleAuth()" id="auth-btn" class="w-full bg-indigo-600 py-4 rounded-xl font-bold">Register & Play</button>
+                <p class="text-center text-sm text-slate-400">
+                    <button onclick="toggleAuthMode()" id="auth-toggle">Already have an account? Login</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-content" class="hidden">
+        <nav class="p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 sticky top-0 z-10">
+            <h1 class="text-xl font-bold text-indigo-400 italic">GAMERPAY</h1>
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-900 px-4 py-1 rounded-full border border-slate-600">
+                    <span id="balance" class="font-mono text-emerald-400 font-bold">0</span> <span class="text-xs text-slate-400">CR</span>
+                </div>
+                <button onclick="logout()" class="text-xs text-red-400 underline">Logout</button>
+            </div>
+        </nav>
+
+        <div id="menu-screen" class="max-w-md mx-auto mt-10 p-4 text-center">
+            <h2 class="text-3xl font-bold mb-2">Ready to Play?</h2>
+            <p class="text-slate-400 mb-8">Select a game to start earning</p>
+            
+            <div onclick="showMinesGame()" class="bg-slate-800 border-2 border-indigo-500/30 p-6 rounded-3xl cursor-pointer hover:border-indigo-500 transition-all group">
+                <div class="text-5xl mb-4 group-hover:scale-110 transition-transform">💣</div>
+                <h3 class="text-xl font-bold">Mines Game</h3>
+                <p class="text-sm text-slate-400 mt-2">Find gems, avoid bombs.</p>
+            </div>
+
+            <button onclick="window.location.href='/withdraw.html'" class="mt-8 w-full bg-slate-100 text-slate-900 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-white transition-colors">
+                Redeem Rewards
             </button>
         </div>
 
-        <div class="flex justify-center gap-6 mt-8 text-sm text-slate-400 underline">
-            <a href="/withdraw.html">Withdraw Rewards</a>
-            <a href="/admin.html">Admin Panel</a>
+        <div id="game-screen" class="hidden max-w-md mx-auto mt-6 p-4">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="backToMenu()" class="text-slate-400 text-sm flex items-center gap-1 hover:text-white">
+                    ← Back to Menu
+                </button>
+                <div class="text-right">
+                    <p class="text-xs text-slate-400 uppercase">Pot</p>
+                    <p id="pot" class="text-xl font-bold text-emerald-400">0</p>
+                </div>
+            </div>
+
+            <div id="grid" class="grid grid-cols-5 gap-2 bg-slate-800 p-4 rounded-3xl border border-slate-700 shadow-2xl"></div>
+
+            <div class="mt-6 space-y-3">
+                <button id="startBtn" onclick="startMines()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold shadow-lg shadow-indigo-500/20">START NEW (10 CR)</button>
+                <button id="cashoutBtn" onclick="cashOut()" disabled class="w-full bg-emerald-600 disabled:opacity-30 py-4 rounded-xl font-bold">CASH OUT</button>
+            </div>
         </div>
     </div>
 
     <script>
-        let credits = 100; // Local state for UI
-        let currentWinnings = 0;
+        let currentUser = null;
         let isGameActive = false;
+        let authMode = 'register';
         let bombs = [];
+        let winnings = 0;
 
-        function initGame() {
-            if(credits < 10) return alert("Not enough credits!");
+        // AUTH LOGIC
+        function showAuthForm() {
+            document.getElementById('tutorial-step').classList.add('hidden');
+            document.getElementById('auth-form').classList.remove('hidden');
+        }
+
+        function toggleAuthMode() {
+            authMode = authMode === 'register' ? 'login' : 'register';
+            document.getElementById('auth-title').innerText = authMode === 'register' ? 'Create Account' : 'Welcome Back';
+            document.getElementById('auth-btn').innerText = authMode === 'register' ? 'Register & Play' : 'Login';
+            document.getElementById('auth-toggle').innerText = authMode === 'register' ? 'Already have an account? Login' : 'New here? Register';
+        }
+
+        async function handleAuth() {
+            const username = document.getElementById('auth-user').value;
+            const password = document.getElementById('auth-pass').value;
+            const path = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+
+            const res = await fetch(path, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+            if(res.ok) {
+                // For login, the server returns user data
+                if(authMode === 'login') {
+                    currentUser = data.user;
+                } else {
+                    // For register, just log them in after success
+                    authMode = 'login';
+                    return handleAuth();
+                }
+                saveAndStart();
+            } else {
+                alert(data.error);
+            }
+        }
+
+        function saveAndStart() {
+            localStorage.setItem('gp_user', JSON.stringify(currentUser));
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('app-content').classList.remove('hidden');
+            document.getElementById('balance').innerText = currentUser.credits;
+        }
+
+        function logout() {
+            localStorage.removeItem('gp_user');
+            location.reload();
+        }
+
+        // NAVIGATION
+        function showMinesGame() {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            createEmptyGrid();
+        }
+
+        function backToMenu() {
+            if(isGameActive && !confirm("Exit and lose current bet?")) return;
+            isGameActive = false;
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+        }
+
+        // GAME LOGIC
+        function createEmptyGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for(let i=0; i<25; i++) {
+                const tile = document.createElement('div');
+                tile.className = "h-14 w-full bg-slate-700 rounded-xl flex items-center justify-center text-xl";
+                grid.appendChild(tile);
+            }
+        }
+
+        function startMines() {
+            if(currentUser.credits < 10) return alert("Low balance!");
             
-            // Deduct 10 credits locally
-            updateBalance(-10);
+            currentUser.credits -= 10;
+            document.getElementById('balance').innerText = currentUser.credits;
             isGameActive = true;
-            currentWinnings = 0;
+            winnings = 0;
+            document.getElementById('pot').innerText = "0";
             document.getElementById('startBtn').disabled = true;
             document.getElementById('cashoutBtn').disabled = false;
 
-            // Simple client-side bomb generation for testing (we'll sync to server later)
             bombs = [];
             while(bombs.length < 5) {
                 let r = Math.floor(Math.random() * 25);
                 if(!bombs.includes(r)) bombs.push(r);
             }
 
-            const grid = document.getElementById('grid');
-            grid.innerHTML = '';
-            for(let i=0; i<25; i++) {
-                const tile = document.createElement('div');
-                tile.className = "h-14 w-14 bg-slate-700 rounded-lg cursor-pointer hover:bg-slate-600 flex items-center justify-center text-xl transition-all";
+            const tiles = document.querySelectorAll('#grid div');
+            tiles.forEach((tile, i) => {
+                tile.innerHTML = '';
+                tile.className = "h-14 w-full bg-slate-700 rounded-xl cursor-pointer hover:bg-slate-600 transition flex items-center justify-center text-xl";
                 tile.onclick = () => revealTile(tile, i);
-                grid.appendChild(tile);
-            }
+            });
         }
 
         function revealTile(el, id) {
@@ -77,38 +192,35 @@
 
             if(bombs.includes(id)) {
                 el.innerHTML = '💣';
-                el.className = "h-14 w-14 bg-red-600 rounded-lg flex items-center justify-center animate-bounce";
-                gameOver(false);
+                el.className = "h-14 w-full bg-red-600 rounded-xl flex items-center justify-center animate-bounce";
+                isGameActive = false;
+                alert("Game Over!");
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('cashoutBtn').disabled = true;
             } else {
                 el.innerHTML = '💎';
-                el.className = "h-14 w-14 bg-emerald-500 rounded-lg flex items-center justify-center shadow-[0_0_10px_#10b981]";
-                currentWinnings += 5;
+                el.className = "h-14 w-full bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/40";
+                winnings += 5;
+                document.getElementById('pot').innerText = winnings;
             }
-        }
-
-        function gameOver(win) {
-            isGameActive = false;
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('cashoutBtn').disabled = true;
-            if(!win) alert("Boom! You lost your bet.");
         }
 
         async function cashOut() {
             if(!isGameActive) return;
-            updateBalance(currentWinnings);
-            alert(`Casheld out ${currentWinnings} credits!`);
-            gameOver(true);
+            currentUser.credits += winnings;
+            document.getElementById('balance').innerText = currentUser.credits;
+            isGameActive = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('cashoutBtn').disabled = true;
+            alert(`Claimed ${winnings} Credits!`);
+            // Here you would add a fetch call to update credits in database.json
         }
 
-        async function updateBalance(amount) {
-            credits += amount;
-            document.getElementById('balanceDisplay').innerText = credits;
-            
-            // TASK: We will add the fetch call here in the next step to save to database.json
+        // On Load Check
+        if(localStorage.getItem('gp_user')) {
+            currentUser = JSON.parse(localStorage.getItem('gp_user'));
+            saveAndStart();
         }
-
-        // Initialize display
-        document.getElementById('balanceDisplay').innerText = credits;
     </script>
 </body>
 </html>
