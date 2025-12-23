@@ -1,83 +1,103 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs'); // Run 'npm install bcryptjs'
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const DB_FILE = './database.json';
+const ADMIN_PASSWORD = "your_secure_password"; // CHANGE THIS
 
-// --- HELPER FUNCTIONS TO READ/WRITE JSON ---
+// --- DB HELPERS ---
 const readDB = () => {
-    if (!fs.existsSync(DB_FILE)) {
-        // Default data if file doesn't exist
-        return { users: [], withdrawals: [] };
-    }
+    if (!fs.existsSync(DB_FILE)) return { users: [], withdrawals: [], config: { mineReward: 5, startCredits: 100 } };
     return JSON.parse(fs.readFileSync(DB_FILE));
 };
+const writeDB = (data) => fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 
-const writeDB = (data) => {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-};
-
-// Add a withdrawal request
-app.post('/api/withdraw', (req, res) => {
+// --- AUTH API ---
+app.post('/api/auth/register', async (req, res) => {
+    const { username, password } = req.body;
     const db = readDB();
-    const newRequest = {
-        id: req.body.id,
-        type: req.body.type,
-        amount: req.body.amount,
-        details: req.body.details,
-        status: 'PENDING'
+    if (db.users.find(u => u.username === username)) return res.status(400).json({ error: "Username taken" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = { 
+        username, 
+        password: hashedPassword, 
+        credits: db.config.startCredits, 
+        joined: new Date().toISOString().split('T')[0] 
     };
-    db.withdrawals.push(newRequest);
+    db.users.push(newUser);
     writeDB(db);
     res.json({ success: true });
 });
 
-
-// --- GAME LOGIC ---
-app.post('/api/mines/start', (req, res) => {
-    const bombLocations = [];
-    while(bombLocations.length < 5) {
-        let r = Math.floor(Math.random() * 25);
-        if(!bombLocations.includes(r)) bombLocations.push(r);
-    }
-    res.json({ message: "Game Started (JSON Mode)", totalMines: 5 });
-});
-
-// --- ADMIN LOGIC ---
-
-// 1. Get all users
-app.get('/api/admin/users', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
     const db = readDB();
-    res.json(db.users);
-});
-
-// 2. Get all pending withdrawals
-app.get('/api/admin/withdrawals', (req, res) => {
-    const db = readDB();
-    const pending = db.withdrawals.filter(w => w.status === 'PENDING');
-    res.json(pending);
-});
-
-// 3. Admin Approval Action
-app.post('/api/admin/approve', (req, res) => {
-    const { id } = req.body;
-    const db = readDB();
-    const index = db.withdrawals.findIndex(w => w.id === id);
-    
-    if (index !== -1) {
-        db.withdrawals[index].status = 'COMPLETED';
-        writeDB(db);
-        res.json({ success: true });
+    const user = db.users.find(u => u.username === username);
+    if (user && await bcrypt.compare(password, user.password)) {
+        res.json({ success: true, user: { username: user.username, credits: user.credits } });
     } else {
-        res.status(404).json({ error: "Request not found" });
+        res.status(401).json({ error: "Invalid credentials" });
     }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`Server running with JSON DB! http://localhost:${PORT}`);
+// --- WITHDRAWAL LOGIC (Fixed for Item 6) ---
+app.post('/api/withdraw', (req, res) => {
+    const { username, amount, type } = req.body;
+    const db = readDB();
+    const user = db.users.find(u => u.username === username);
+
+    if (!user || user.credits < amount) return res.status(400).json({ error: "Insufficient credits" });
+
+    const claimCode = "GP-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+    user.credits -= amount;
+    
+    db.withdrawals.push({
+        id: Date.now(),
+        username,
+        type,
+        amount,
+        code: claimCode,
+        status: 'PENDING',
+        date: new Date().toISOString()
+    });
+
+    writeDB(db);
+    res.json({ success: true, code: claimCode });
 });
+
+// --- ADMIN API (Fixed for Item 3 & 4) ---
+app.post('/api/admin/auth', (req, res) => {
+    res.json({ success: req.body.password === ADMIN_PASSWORD });
+});
+
+app.get('/api/admin/stats', (req, res) => {
+    const db = readDB();
+    const today = new Date().toISOString().split('T')[0];
+    res.json({
+        totalUsers: db.users.length,
+        dailyUsers: db.users.filter(u => u.joined === today).length,
+        totalWithdrawals: db.withdrawals.length,
+        config: db.config
+    });
+});
+
+app.post('/api/admin/update-credits', (req, res) => {
+    const { username, amount, action, adminPass } = req.body;
+    if(adminPass !== ADMIN_PASSWORD) return res.status(403).send();
+    
+    const db = readDB();
+    const user = db.users.find(u => u.username === username);
+    if(user) {
+        user.credits = action === 'add' ? user.credits + parseInt(amount) : user.credits - parseInt(amount);
+        writeDB(db);
+        res.json({ success: true, newBalance: user.credits });
+    }
+});
+
+app.listen(3000, () => console.log('Server running on port 3000'));
