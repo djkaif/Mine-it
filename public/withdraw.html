@@ -40,27 +40,45 @@
             </button>
         </div>
 
-        <div id="success-screen" class="hidden text-center space-y-6 py-10">
-            <div class="text-6xl">✅</div>
-            <h2 class="text-3xl font-bold">Request Sent!</h2>
-            <p class="text-slate-400">Your unique claim code is generated. **Screenshot this or copy it.**</p>
-            
-            <div class="bg-slate-800 border-2 border-dashed border-indigo-500 p-6 rounded-2xl">
-                <p class="text-xs text-slate-400 uppercase mb-1">Your Claim Code</p>
-                <p id="claim-code-display" class="text-3xl font-mono font-black tracking-widest text-white">------</p>
-            </div>
 
-            <div class="bg-indigo-900/30 p-4 rounded-xl border border-indigo-500/30">
-                <p class="text-sm text-indigo-200">
-                    📩 **Instructions:**<br>
-                    DM this code to the Owner on Discord. You will be asked for your payout details there.
-                </p>
-            </div>
-
-            <button onclick="window.location.href='/'" class="w-full bg-slate-700 py-3 rounded-xl font-bold text-sm">Return Home</button>
-        </div>
+<div id="success-screen" class="hidden text-center space-y-6 py-10">
+    <div class="text-6xl animate-bounce">✅</div>
+    <h2 class="text-3xl font-bold">Request Sent!</h2>
+    <p class="text-slate-400 text-sm">Your unique claim code is generated. <strong>Screenshot this or copy it now.</strong></p>
+    
+    <div class="bg-slate-800 border-2 border-dashed border-indigo-500 p-6 rounded-2xl relative group">
+        <p class="text-xs text-slate-400 uppercase mb-1">Your Claim Code</p>
+        <p id="claim-code-display" class="text-3xl font-mono font-black tracking-widest text-white select-all">------</p>
+        <p class="text-[10px] text-indigo-400 mt-2 opacity-50 italic">Click the code to select it</p>
     </div>
 
+    <div class="bg-indigo-900/30 p-6 rounded-2xl border border-indigo-500/30 text-left">
+        <h3 class="text-indigo-400 font-bold text-sm uppercase mb-2 flex items-center gap-2">
+            <span>📩</span> Next Steps
+        </h3>
+        <ul class="text-sm text-indigo-100 space-y-3">
+            <li class="flex gap-2">
+                <span class="text-indigo-400 font-bold">1.</span>
+                <span>Copy the code above.</span>
+            </li>
+            <li class="flex gap-2">
+                <span class="text-indigo-400 font-bold">2.</span>
+                <span>Open Discord and DM the owner: <strong class="bg-indigo-600 px-2 py-0.5 rounded text-white">@dj_kaif_bd</strong></span>
+            </li>
+            <li class="flex gap-2">
+                <span class="text-indigo-400 font-bold">3.</span>
+                <span>Provide your payout details (Roblox User/PayPal) in the DM.</span>
+            </li>
+        </ul>
+    </div>
+
+    <button onclick="window.location.href='/'" class="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold text-sm transition-colors">
+        Return Home
+    </button>
+</div>
+        
+
+        
     <script>
         // Load User Balance
         const userData = JSON.parse(localStorage.getItem('gp_user'));
