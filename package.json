@@ -1,11 +1,18 @@
 {
-  "name": "mine-platform",
+  "name": "Mine-it",
   "version": "1.0.0",
+  "description": "GamerPay Mines Game with MongoDB Atlas",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.0",
+    "mongoose": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
-
