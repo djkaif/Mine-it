@@ -6,52 +6,117 @@
     <title>Withdraw - GamerPay</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-white p-6">
+<body class="bg-slate-900 text-white min-h-screen font-sans p-6">
+
     <div class="max-w-md mx-auto">
-        <a href="/" class="text-indigo-400 text-sm">← Back to Game</a>
-        <h1 class="text-2xl font-bold mt-4">Redeem Rewards</h1>
-        
-        <div class="mt-6 space-y-4">
-            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                <label class="block text-xs text-slate-400 uppercase">Reward Type</label>
-                <select id="type" class="w-full bg-transparent mt-1 font-bold outline-none">
-                    <option class="bg-slate-800">Robux (100 Credits = 10 RBX)</option>
-                    <option class="bg-slate-800">PayPal Cash ($1 = 1000 Credits)</option>
+        <div class="flex justify-between items-center mb-8">
+            <button onclick="window.location.href='/'" class="text-slate-400 text-sm">← Back to Game</button>
+            <div class="text-right">
+                <p class="text-xs text-slate-400 uppercase">Your Balance</p>
+                <p id="user-balance" class="text-xl font-bold text-emerald-400">0</p>
+            </div>
+        </div>
+
+        <div id="withdraw-form-container" class="space-y-6">
+            <h1 class="text-3xl font-bold">Redeem Rewards</h1>
+            <p class="text-slate-400 text-sm">Withdrawals generate a unique code. DM this code to our Discord to receive your reward.</p>
+
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <label class="block text-xs font-bold text-indigo-400 uppercase mb-2">Select Reward</label>
+                <select id="reward-type" class="w-full bg-transparent font-bold text-lg outline-none cursor-pointer">
+                    <option class="bg-slate-800" value="Robux">Robux (Minimum 1000 CR)</option>
+                    <option class="bg-slate-800" value="PayPal">PayPal Cash (Minimum 5000 CR)</option>
+                    <option class="bg-slate-800" value="GiftCard">Gift Card (Minimum 10000 CR)</option>
                 </select>
             </div>
 
-            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                <label class="block text-xs text-slate-400 uppercase">Amount</label>
-                <input id="amount" type="number" placeholder="Enter credits" class="w-full bg-transparent mt-1 outline-none font-mono">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <label class="block text-xs font-bold text-indigo-400 uppercase mb-2">Credit Amount</label>
+                <input id="withdraw-amount" type="number" placeholder="Min. 1000" class="w-full bg-transparent text-xl font-mono outline-none">
             </div>
 
-            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                <label class="block text-xs text-slate-400 uppercase">Your Details (Username/Email)</label>
-                <input id="details" type="text" placeholder="e.g. PlayerName#123" class="w-full bg-transparent mt-1 outline-none">
-            </div>
-
-            <button onclick="requestWithdraw()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold shadow-lg">
-                SUBMIT REQUEST
+            <button onclick="submitWithdrawal()" id="submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all">
+                GENERATE CLAIM CODE
             </button>
+        </div>
+
+        <div id="success-screen" class="hidden text-center space-y-6 py-10">
+            <div class="text-6xl">✅</div>
+            <h2 class="text-3xl font-bold">Request Sent!</h2>
+            <p class="text-slate-400">Your unique claim code is generated. **Screenshot this or copy it.**</p>
+            
+            <div class="bg-slate-800 border-2 border-dashed border-indigo-500 p-6 rounded-2xl">
+                <p class="text-xs text-slate-400 uppercase mb-1">Your Claim Code</p>
+                <p id="claim-code-display" class="text-3xl font-mono font-black tracking-widest text-white">------</p>
+            </div>
+
+            <div class="bg-indigo-900/30 p-4 rounded-xl border border-indigo-500/30">
+                <p class="text-sm text-indigo-200">
+                    📩 **Instructions:**<br>
+                    DM this code to the Owner on Discord. You will be asked for your payout details there.
+                </p>
+            </div>
+
+            <button onclick="window.location.href='/'" class="w-full bg-slate-700 py-3 rounded-xl font-bold text-sm">Return Home</button>
         </div>
     </div>
 
     <script>
-        async function requestWithdraw() {
-            const data = {
-                type: document.getElementById('type').value,
-                amount: document.getElementById('amount').value,
-                details: document.getElementById('details').value,
-                id: Date.now() // Unique ID for testing
-            };
+        // Load User Balance
+        const userData = JSON.parse(localStorage.getItem('gp_user'));
+        if (!userData) {
+            window.location.href = '/'; // Kick to home if not logged in
+        } else {
+            document.getElementById('user-balance').innerText = userData.credits;
+        }
 
-            const res = await fetch('/api/withdraw', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
+        async function submitWithdrawal() {
+            const amount = parseInt(document.getElementById('withdraw-amount').value);
+            const type = document.getElementById('reward-type').value;
 
-            if(res.ok) alert("Request sent to Admin! Wait for approval.");
+            // CLIENT-SIDE VALIDATION
+            if (isNaN(amount) || amount < 1000) {
+                return alert("Minimum withdrawal is 1000 credits.");
+            }
+            if (amount > userData.credits) {
+                return alert("You do not have enough credits for this withdrawal.");
+            }
+
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerText = "Processing...";
+
+            try {
+                const res = await fetch('/api/withdraw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: userData.username,
+                        amount: amount,
+                        type: type
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    // Update Local Storage Balance
+                    userData.credits -= amount;
+                    localStorage.setItem('gp_user', JSON.stringify(userData));
+
+                    // Show Success Screen
+                    document.getElementById('withdraw-form-container').classList.add('hidden');
+                    document.getElementById('success-screen').classList.remove('hidden');
+                    document.getElementById('claim-code-display').innerText = data.code;
+                } else {
+                    alert(data.error);
+                    btn.disabled = false;
+                    btn.innerText = "GENERATE CLAIM CODE";
+                }
+            } catch (err) {
+                alert("Server error. Try again later.");
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
