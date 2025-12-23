@@ -4,13 +4,18 @@ const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 const app = express();
 
+// CHANGE 1: Use Render's dynamic port
+const PORT = process.env.PORT || 3000;
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const ADMIN_PASSWORD = "1234nah";
 
-// --- DATABASE SETUP ---
-const db = new sqlite3.Database('./database.sqlite', (err) => {
+// CHANGE 2: Use the Persistent Disk path on Render
+const DB_PATH = process.env.RENDER ? '/data/database.sqlite' : './database.sqlite';
+
+const db = new sqlite3.Database(DB_PATH, (err) => {
     if (err) console.error(err.message);
     console.log('Connected to SQLite database.');
 });
@@ -157,4 +162,5 @@ app.post('/api/admin/approve', (req, res) => {
     });
 });
 
-app.listen(3000, () => console.log('Server running with SQLite on port 3000'));
+// Final Change: Listen on the Dynamic Port
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
