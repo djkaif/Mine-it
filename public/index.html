@@ -3,44 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mines Rewards</title>
+    <title>GamerPay - Play & Earn</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-white font-sans">
-    <nav class="p-4 bg-slate-800 flex justify-between">
-        <h1 class="text-xl font-bold text-indigo-400">GamerPay</h1>
-        <div>Credits: <span id="balance">100</span></div>
+<body class="bg-slate-900 text-white min-h-screen">
+    <nav class="p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700">
+        <h1 class="text-xl font-bold text-indigo-400 italic">GAMERPAY</h1>
+        <div class="bg-slate-900 px-4 py-1 rounded-full border border-slate-600">
+            <span class="text-xs text-slate-400">Balance:</span>
+            <span id="balanceDisplay" class="font-mono text-emerald-400">0</span>
+        </div>
     </nav>
 
-    <div class="max-w-md mx-auto mt-10 p-4">
-        <div id="grid" class="grid grid-cols-5 gap-2 bg-slate-800 p-4 rounded-xl">
+    <div class="max-w-md mx-auto mt-8 p-4">
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold">Mines Game</h2>
+            <p class="text-slate-400 text-sm">Find gems, avoid the 5 hidden bombs!</p>
+        </div>
+
+        <div id="grid" class="grid grid-cols-5 gap-2 bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-700">
             </div>
-        <button onclick="startGame()" class="w-full mt-6 bg-indigo-600 py-3 rounded-lg font-bold">START GAME</button>
+
+        <div class="mt-6 space-y-3">
+            <button id="startBtn" onclick="initGame()" class="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-bold transition shadow-lg shadow-indigo-500/20">
+                NEW GAME (Cost 10)
+            </button>
+            <button id="cashoutBtn" onclick="cashOut()" disabled class="w-full bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed py-3 rounded-xl font-bold transition">
+                CASH OUT
+            </button>
+        </div>
+
+        <div class="flex justify-center gap-6 mt-8 text-sm text-slate-400 underline">
+            <a href="/withdraw.html">Withdraw Rewards</a>
+            <a href="/admin.html">Admin Panel</a>
+        </div>
     </div>
 
     <script>
-        function startGame() {
+        let credits = 100; // Local state for UI
+        let currentWinnings = 0;
+        let isGameActive = false;
+        let bombs = [];
+
+        function initGame() {
+            if(credits < 10) return alert("Not enough credits!");
+            
+            // Deduct 10 credits locally
+            updateBalance(-10);
+            isGameActive = true;
+            currentWinnings = 0;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('cashoutBtn').disabled = false;
+
+            // Simple client-side bomb generation for testing (we'll sync to server later)
+            bombs = [];
+            while(bombs.length < 5) {
+                let r = Math.floor(Math.random() * 25);
+                if(!bombs.includes(r)) bombs.push(r);
+            }
+
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
             for(let i=0; i<25; i++) {
                 const tile = document.createElement('div');
-                tile.className = "h-12 w-12 bg-slate-700 rounded cursor-pointer hover:bg-slate-600 transition flex items-center justify-center";
+                tile.className = "h-14 w-14 bg-slate-700 rounded-lg cursor-pointer hover:bg-slate-600 flex items-center justify-center text-xl transition-all";
                 tile.onclick = () => revealTile(tile, i);
                 grid.appendChild(tile);
             }
         }
-        
+
         function revealTile(el, id) {
-            // 20% chance of bomb for this demo
-            const isBomb = Math.random() < 0.2;
-            el.innerHTML = isBomb ? '💣' : '💎';
-            el.className = isBomb ? "h-12 w-12 bg-red-600 rounded flex items-center justify-center" : "h-12 w-12 bg-emerald-500 rounded flex items-center justify-center";
-            el.onclick = null; // Disable further clicks on this tile
-            if(isBomb) {
-                setTimeout(() => alert("Game Over!"), 100);
+            if(!isGameActive || el.innerHTML !== '') return;
+
+            if(bombs.includes(id)) {
+                el.innerHTML = '💣';
+                el.className = "h-14 w-14 bg-red-600 rounded-lg flex items-center justify-center animate-bounce";
+                gameOver(false);
+            } else {
+                el.innerHTML = '💎';
+                el.className = "h-14 w-14 bg-emerald-500 rounded-lg flex items-center justify-center shadow-[0_0_10px_#10b981]";
+                currentWinnings += 5;
             }
         }
+
+        function gameOver(win) {
+            isGameActive = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('cashoutBtn').disabled = true;
+            if(!win) alert("Boom! You lost your bet.");
+        }
+
+        async function cashOut() {
+            if(!isGameActive) return;
+            updateBalance(currentWinnings);
+            alert(`Casheld out ${currentWinnings} credits!`);
+            gameOver(true);
+        }
+
+        async function updateBalance(amount) {
+            credits += amount;
+            document.getElementById('balanceDisplay').innerText = credits;
+            
+            // TASK: We will add the fetch call here in the next step to save to database.json
+        }
+
+        // Initialize display
+        document.getElementById('balanceDisplay').innerText = credits;
     </script>
 </body>
 </html>
-
